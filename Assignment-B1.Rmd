@@ -1,0 +1,140 @@
+---
+title: "Assignment-B1"
+author: "Tongshuai Zhang"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercise 1: Make a Function
+
+In the MDA project, I repeated use the used **group_by() %>% summarise()** statement for **vancouver_trees** dataset Therefore, it would be appropriate 
+to create a generic function that group by a specific column and summarize the proportion calculated by another specific column in the dataset.
+
+```{r}
+library(dplyr)
+library(datateachr) # <- might contain the data you picked!
+library(tidyverse)
+
+group_distinct_col_count_prop <- function(dataset, group_col, summary_col) {
+  stopifnot(is.data.frame(dataset))
+  
+  # Check if group_col and summary_col are present in the dataset
+  if (!(group_col %in% colnames(dataset))) {
+    stop("Error: group_col is not a column in the dataset.")
+  }
+  if (!(summary_col %in% colnames(dataset))) {
+    stop("Error: summary_col is not a column in the dataset.")
+  }
+  
+  total_summary_col_distinct_count <- n_distinct(dataset[[summary_col]])
+  
+  result <- dataset %>%
+    group_by(.data[[group_col]]) %>%
+    summarise(total = n_distinct(.data[[summary_col]])) %>%
+    mutate(proportion = total / total_summary_col_distinct_count)
+  return(result)
+}
+```
+
+# Exercise 2: Document the Function
+
+```{r}
+
+#' @title Group by a Column and Calculate Proportion of Distinct Values in Another Column
+#' @description 
+#' This function groups a given dataset by a specified column and then calculates the  
+#' proportion of distinct values in another specified column within each group. 
+#' It is designed to provide a quick and generic way to summarize data, which is useful in exploratory data analysis.
+#' @param dataset: A data frame containing the data to be grouped and summarized.
+#' @param group_col: A string representing the name of the column to group by.
+#' @param summary_col: A string representing the name of the column to calculate the proportion of distinct values.
+#' @return: A data frame containing the grouping column, the total count of distinct values in the summary_col for each group, and 
+#' the proportion of these distinct values relative to the total distinct values in summary_col across the entire dataset.
+
+group_distinct_col_count_prop <- function(dataset, group_col, summary_col) {
+  stopifnot(is.data.frame(dataset))
+  
+  # Check if group_col and summary_col are present in the dataset
+  if (!(group_col %in% colnames(dataset))) {
+    stop("Error: group_col is not a column in the dataset.")
+  }
+  if (!(summary_col %in% colnames(dataset))) {
+    stop("Error: summary_col is not a column in the dataset.")
+  }
+  
+  total_summary_col_distinct_count <- n_distinct(dataset[[summary_col]], na.rm = TRUE)
+  
+  result <- dataset %>%
+    group_by(.data[[group_col]]) %>%
+    summarise(total = n_distinct(.data[[summary_col]], na.rm = TRUE)) %>%
+    mutate(proportion = total / total_summary_col_distinct_count)
+  return(result)
+}
+```
+
+# Exercise 3: Include examples
+
+## Example 01:
+```{r}
+# Check the number of species and its proportion to the total species for every distinct neighbourhood_name
+vancouver_trees_summary_by_neighbourhood <- group_distinct_col_count_prop(vancouver_trees, group_col = "neighbourhood_name", summary_col = "species_name")
+vancouver_trees_summary_by_neighbourhood
+```
+
+## Example 02:
+```{r}
+# Check the number of species and its proportion to the total species for every distinct std_street
+vancouver_trees_summary_by_str_street <- group_distinct_col_count_prop(vancouver_trees, group_col = "std_street", summary_col = "species_name")
+vancouver_trees_summary_by_str_street
+```
+
+## Example 03:
+```{r}
+vancouver_trees
+# Check the number of species and its proportion to the total species for every distinct genus
+vancouver_trees_summary_by_genus <- group_distinct_col_count_prop(vancouver_trees, group_col = "genus_name", summary_col = "species_name")
+vancouver_trees_summary_by_genus
+```
+
+# Exercise 4: Test the Function
+
+```{r}
+library(testthat)
+# Define the function group_distinct_col_count_prop here
+
+# Sample test data
+test_data <- data.frame(
+  Species = c("Oak", "Maple", "Oak", "Pine", "Maple", "Pine", NA),
+  Height = c(10, 15, 20, 25, 30, 35, 40)
+)
+
+# Test cases
+test_that("group_distinct_col_count_prop function works correctly", {
+  
+  # Test 1: Vector with no NA's
+  result1 <- group_distinct_col_count_prop(test_data[1:6, ], "Species", "Height")
+  result1
+  expect_equal(nrow(result1), 3)
+  expect_equal(sum(result1$proportion), 1)
+  
+  # Test 2: Vector that has NA's
+  result2 <- group_distinct_col_count_prop(test_data, "Species", "Height")
+  expect_equal(nrow(result2), 4)
+  expect_equal(sum(result2$proportion, na.rm = TRUE), 1)
+  
+  # Test 3: Vector of length 0
+  empty_data <- test_data[FALSE, ]
+  result3 <- group_distinct_col_count_prop(empty_data, "Species", "Height")
+  expect_equal(nrow(result3), 0)
+})
+
+# Test 4: Vector that hasn't the column specified in the function arguments
+test_that("group_distinct_col_count_prop handles non-existent columns correctly", {
+  expect_error(group_distinct_col_count_prop(test_data, "Species", "Heights"),
+               "Error: summary_col is not a column in the dataset.")
+})
+```
